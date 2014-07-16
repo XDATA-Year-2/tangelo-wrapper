@@ -131,13 +131,6 @@
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QPushButton" name="bottleButton">
-           <property name="text">
-            <string>Bottle...</string>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>

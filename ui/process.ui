@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>591</width>
-    <height>328</height>
+    <width>590</width>
+    <height>286</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -65,7 +65,7 @@
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QLineEdit" name="logField">
+          <widget class="QLineEdit" name="logdirField">
            <property name="toolTip">
             <string>The directory that contains the Tangelo log file (tangelo.log)</string>
            </property>
@@ -98,21 +98,21 @@
           </widget>
          </item>
          <item row="2" column="2">
-          <widget class="QPushButton" name="pushButton_4">
+          <widget class="QPushButton" name="browseRoot">
            <property name="text">
             <string>Browse...</string>
            </property>
           </widget>
          </item>
          <item row="3" column="2">
-          <widget class="QPushButton" name="pushButton_6">
+          <widget class="QPushButton" name="browseLogdir">
            <property name="text">
             <string>Browse...</string>
            </property>
           </widget>
          </item>
          <item row="4" column="2">
-          <widget class="QPushButton" name="pushButton_7">
+          <widget class="QPushButton" name="browseVtk">
            <property name="text">
             <string>Browse...</string>
            </property>
@@ -280,9 +280,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="startButton">
+       <widget class="QPushButton" name="restartButton">
         <property name="text">
-         <string>Start</string>
+         <string>Save and Restart</string>
         </property>
         <property name="autoDefault">
          <bool>true</bool>
