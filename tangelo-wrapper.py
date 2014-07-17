@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import sys, os, subprocess, json, socket
-from PySide.QtGui import QApplication, QMessageBox, QFileDialog, QLineEdit
+from PySide.QtGui import QApplication, QFileDialog
 from PySide.QtCore import QFile, Qt
 from PySide.QtUiTools import QUiLoader
 
 loader = None
 mainWindow = None
+TANGELO_PATH = None
+PYTHON_PATH = None
+common_tangelo_paths = ['/Library/Frameworks/Python.framework/Versions/2.7/bin']
 
 SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -26,12 +29,12 @@ class ProcessManager:
         self.configPath = path
         
         # Show the UI
-        infile = QFile('ui/process.ui')
+        infile = QFile('process.ui')
         infile.open(QFile.ReadOnly)
         self.window = loader.load(infile, mainWindow.window)
         infile.close()
         
-        self.window.setWindowTitle(self.configPath + " (" + self.pid + ")")
+        self.window.setWindowTitle(self.configPath + " (pid: " + self.pid + ")")
         self.window.hostnameField.setText(config['hostname'])
         self.window.portField.setValue(config['port'])
         self.window.rootField.setText(config['root'])
@@ -93,7 +96,7 @@ class ProcessManager:
     
     def stop(self):
         self.updateConfig()
-        if mainWindow.issueTangeloCommand(['tangelo', 'stop', '--pid', str(self.pid), '--verbose'], self.config['logdir']):
+        if mainWindow.issueTangeloCommand([PYTHON_PATH, TANGELO_PATH, 'stop', '--pid', str(self.pid), '--verbose'], self.config['logdir']):
             self.window.restartButton.clicked.disconnect(self.restart)
             self.window.restartButton.clicked.connect(self.start)
             self.window.restartButton.setText('Save and Start')
@@ -103,7 +106,7 @@ class ProcessManager:
     def restart(self):
         self.updateConfig()
         oldPids = mainWindow.pids
-        if not mainWindow.issueTangeloCommand(['tangelo', 'restart', '-c', self.configPath, '--verbose'], self.config['logdir']):
+        if not mainWindow.issueTangeloCommand([PYTHON_PATH, TANGELO_PATH, 'restart', '-c', self.configPath, '--verbose'], self.config['logdir']):
             self.window.restartButton.clicked.disconnect(self.restart)
             self.window.restartButton.clicked.connect(self.start)
             self.window.restartButton.setText('Save and Start')
@@ -111,13 +114,13 @@ class ProcessManager:
         for p in mainWindow.pids:
             if not p in oldPids:
                 self.pid = p
-                self.window.setWindowTitle(self.configPath + " (" + self.pid + ")")
+                self.window.setWindowTitle(self.configPath + " (pid: " + self.pid + ")")
                 break
     
     def start(self):
         self.updateConfig()
         oldPids = mainWindow.pids
-        if mainWindow.issueTangeloCommand(['tangelo', 'start', '-c', self.configPath, '--verbose'], self.config['logdir']):
+        if mainWindow.issueTangeloCommand([PYTHON_PATH, TANGELO_PATH, 'start', '-c', self.configPath, '--verbose'], self.config['logdir']):
             self.window.restartButton.clicked.disconnect(self.start)
             self.window.restartButton.clicked.connect(self.restart)
             self.window.restartButton.setText('Save and Restart')
@@ -125,7 +128,7 @@ class ProcessManager:
         for p in mainWindow.pids:
             if not p in oldPids:
                 self.pid = p
-                self.window.setWindowTitle(self.configPath + " (" + self.pid + ")")
+                self.window.setWindowTitle(self.configPath + " (pid: " + self.pid + ")")
                 break
 
 class Process:
@@ -138,7 +141,7 @@ class Process:
         # To clone the widget, I need to load it from the file
         # multiple times... there really isn't a more elegant way
         # to do this
-        infile = QFile('ui/overview_template.ui')
+        infile = QFile('overview_template.ui')
         infile.open(QFile.ReadOnly)
         self.widget = loader.load(infile, mainWindow.window)
         infile.close()
@@ -147,20 +150,20 @@ class Process:
         self.widget.groupBox.setTitle(pid)
         self.widget.pidLabel.setText(pid)
         self.widget.statusLabel.setText(subprocess.Popen( \
-            ['tangelo', 'status', '--pid', pid, '--attr', 'status'], \
+            [PYTHON_PATH, TANGELO_PATH, 'status', '--pid', pid, '--attr', 'status'], \
             stdout=subprocess.PIPE).communicate()[0].strip())
         self.widget.interfaceLabel.setText(subprocess.Popen( \
-            ['tangelo', 'status', '--pid', pid, '--attr', 'interface'], \
+            [PYTHON_PATH, TANGELO_PATH, 'status', '--pid', pid, '--attr', 'interface'], \
             stdout=subprocess.PIPE).communicate()[0].strip())
         self.configPath = subprocess.Popen( \
-            ['tangelo', 'status', '--pid', pid, '--attr', 'config'], \
+            [PYTHON_PATH, TANGELO_PATH, 'status', '--pid', pid, '--attr', 'config'], \
             stdout=subprocess.PIPE).communicate()[0].strip()
         self.widget.configLabel.setText(self.configPath)
         self.widget.logLabel.setText(subprocess.Popen( \
-            ['tangelo', 'status', '--pid', pid, '--attr', 'log'], \
+            [PYTHON_PATH, TANGELO_PATH, 'status', '--pid', pid, '--attr', 'log'], \
             stdout=subprocess.PIPE).communicate()[0].strip())
         self.widget.rootLabel.setText(subprocess.Popen( \
-            ['tangelo', 'status', '--pid', pid, '--attr', 'root'], \
+            [PYTHON_PATH, TANGELO_PATH, 'status', '--pid', pid, '--attr', 'root'], \
             stdout=subprocess.PIPE).communicate()[0].strip())
         
         # TODO: Don't know why connecting to self.manageProcess directly isn't working...
@@ -179,9 +182,9 @@ class Process:
         self.manager = ProcessManager(config, pid, self.configPath)
 
 class Overview:
-    def __init__(self):
+    def startup(self):
         # Load UI files
-        infile = QFile("ui/overview.ui")
+        infile = QFile("overview.ui")
         infile.open(QFile.ReadOnly)
         self.window = loader.load(infile, None)
         infile.close()
@@ -193,25 +196,8 @@ class Overview:
         self.window.startButton.clicked.connect(self.findOrSaveConfig)
         
         self.window.show()
-        '''
-        self.window.quitButton.clicked.connect(self.window.close)
-        self.window.addButton.clicked.connect(self.addGene)
-        self.window.geneBox.editTextChanged.connect(self.editGene)
-        self.window.speedSlider.valueChanged.connect(self.changeSpeed)
-        self.window.timeSlider.valueChanged.connect(self.changeTime)
         
-        self.window.addButton.setEnabled(False)
-        
-        self.window.showFullScreen()
-        #self.window.show()
-        
-        # Start timer
-        
-        # Update timer
-        self.timer = QTimer(self.window)
-        self.timer.timeout.connect(self.nextFrame)
-        self.timer.start(Viz.FRAME_DURATION)
-        '''
+        self.refresh()
     def refresh(self, clearOutputOnSuccess=True):
         layout = self.window.scrollContents.layout()
         clearLayout(layout)
@@ -232,18 +218,18 @@ class Overview:
     
     def getPidList(self):
         try:
-            status = subprocess.Popen(['tangelo','status','--pids'], stderr=subprocess.PIPE).communicate()[1]
+            status = subprocess.Popen([PYTHON_PATH, TANGELO_PATH,'status','--pids'], stderr=subprocess.PIPE).communicate()[1]
             
             if status.startswith('no tangelo instances'):
                 return []
             else:
                 return [x.strip() for x in status.split('\n')[0].split(':')[1].split(',')]
         except OSError as e:
-            self.window.consoleOutput.setPlainText('Error communicating with tangelo: ' + e.strerror)
+            self.window.consoleOutput.setPlainText('Error communicating with tangelo: ' + e.strerror + "\n" + str(e))
             return None
     
     def findOrSaveConfig(self):
-        infile = QFile('ui/config.ui')
+        infile = QFile('config.ui')
         infile.open(QFile.ReadOnly)
         dialog = loader.load(infile, self.window)
         infile.close()
@@ -296,7 +282,7 @@ class Overview:
             self.window.consoleOutput.setPlainText("Couldn't save " + path + ":" + e.strerror)
             return
         
-        success = self.issueTangeloCommand(['tangelo', 'start', '-c', path, '--verbose'], config['logdir'])
+        self.issueTangeloCommand([PYTHON_PATH, TANGELO_PATH, 'start', '-c', path, '--verbose'], config['logdir'])
         self.refresh(False)
     
     def issueTangeloCommand(self, command, logdir=None):
@@ -360,10 +346,61 @@ class Overview:
         outfile.write("// Tangelo config file auto-generated by tangelo_wrapper.\n")
         outfile.write(json.dumps(config, separators=[", ",": "], indent=4))
         outfile.close()
+    
+    def findTangelo(self):
+        global PYTHON_PATH, TANGELO_PATH
+        if sys.platform == 'win32':
+            pythonPath = subprocess.Popen(['where', 'python'], stdout=subprocess.PIPE)
+            tangeloPath = subprocess.Popen(['where', 'tangelo'], stdout=subprocess.PIPE)
+        else:
+            pythonPath = subprocess.Popen(['which', 'python'], stdout=subprocess.PIPE)
+            tangeloPath = subprocess.Popen(['which', 'tangelo'], stdout=subprocess.PIPE)
+        PYTHON_PATH = pythonPath.communicate()[0].strip()
+        TANGELO_PATH = tangeloPath.communicate()[0].strip()
+        
+        sys.stderr.write("python: " + PYTHON_PATH + "tangelo: " + TANGELO_PATH)
+        
+        if (os.path.exists(PYTHON_PATH) and os.path.exists(TANGELO_PATH)):
+            return True
+                
+        infile = QFile('find_tangelo.ui')
+        infile.open(QFile.ReadOnly)
+        dialog = loader.load(infile, None)
+        infile.close()
+        
+        def pythonBrowse():
+            path = QFileDialog.getOpenFileName(dialog, u"Find python", dialog.pythonPathBox.text())[0]
+            if path != '':
+                dialog.pythonPathBox.setText(path)
+        
+        def tangeloBrowse():
+            path = QFileDialog.getOpenFileName(dialog, u"Find tangelo", dialog.tangeloPathBox.text())[0]
+            if path != '':
+                dialog.tangeloPathBox.setText(path)
+        
+        def cancel():
+            dialog.hide()
+            sys.exit()
+        
+        def ok():
+            global PYTHON_PATH, TANGELO_PATH
+            PYTHON_PATH = os.path.expanduser(dialog.pythonPathBox.text())
+            TANGELO_PATH = os.path.expanduser(dialog.tangeloPathBox.text())
+            self.startup()
+            dialog.hide()
+        dialog.show()
+        
+        dialog.tangeloBrowse.clicked.connect(tangeloBrowse)
+        dialog.pythonBrowse.clicked.connect(pythonBrowse)
+        dialog.cancelButton.clicked.connect(cancel)
+        dialog.okButton.clicked.connect(ok)
+        
+        return False
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     loader = QUiLoader()
     mainWindow = Overview()
-    mainWindow.refresh()
+    if mainWindow.findTangelo():
+        mainWindow.startup()
     sys.exit(app.exec_())
