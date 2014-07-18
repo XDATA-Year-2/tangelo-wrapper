@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Tangelo Wrapper</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>ui/images/icon.iconset/icon_16x16.png</normaloff>ui/images/icon.iconset/icon_16x16.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>

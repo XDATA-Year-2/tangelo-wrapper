@@ -1,4 +1,4 @@
 tangelo-wrapper
 ===============
 
-GUI wrapper for managing and bottling [tangelo](http://tangelo.kitware.com) instances.
+GUI for managing and wrapping up [tangelo](http://tangelo.kitware.com) instances.
