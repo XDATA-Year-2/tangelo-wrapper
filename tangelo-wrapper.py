@@ -5,30 +5,105 @@ from PySide.QtCore import QFile, Qt
 from PySide.QtUiTools import QUiLoader
 
 class Globals:
-    loader = None
     mainWindow = None
     redPixmap = None
     redIcon = None
     greenPixmap = None
     greenIcon = None
+    tangeloProcessCommands = set(['start', 'restart'])
+    tangeloDefaultConfigPaths = [
+        '/etc/tangelo.conf',
+        os.path.expanduser('~/.config/tangelo/tangelo.conf'),
+        '/usr/share/tangelo/conf/tangelo.conf.local'
+    ]
+    tangeloPath = None
+    pythonPath = None
     
     @staticmethod
     def load():
-        Globals.loader = QUiLoader()
         Globals.redPixmap = QPixmap('ui/images/indicators/red.png')
         Globals.redIcon = QIcon('ui/images/indicators/red.png')
         Globals.greenPixmap = QPixmap('ui/images/indicators/green.png')
         Globals.greenIcon = QIcon('ui/images/indicators/green.png')
+        Globals.findTangelo()
+    
+    @staticmethod
+    def criticalError(message):
+        msgBox = QMessageBox()
+        msgBox.setIcon(QMessageBox.Critical)
+        msgBox.setText(message)
+        return msgBox.exec_()
+    
+    @staticmethod
+    def findTangelo():
+        infile = QFile('ui/find_tangelo.ui')
+        infile.open(QFile.ReadOnly)
+        loader = QUiLoader()
+        dialog = loader.load(infile, None)
+        infile.close()
+        
+        if sys.platform.startswith('win'):
+            Globals.pythonPath = subprocess.Popen(['where', 'python'], stdout=subprocess.PIPE).communicate()[0].strip()
+            Globals.tangeloPath = subprocess.Popen(['where', 'tangelo'], stdout=subprocess.PIPE).communicate()[0].strip()
+        else:
+            Globals.pythonPath = subprocess.Popen(['which', 'python'], stdout=subprocess.PIPE).communicate()[0].strip()
+            Globals.tangeloPath = subprocess.Popen(['which', 'tangelo'], stdout=subprocess.PIPE).communicate()[0].strip()
+        
+        if os.path.exists(Globals.pythonPath):
+            dialog.pythonPathBox.setText(Globals.pythonPath)
+        if os.path.exists(Globals.tangeloPath):
+            dialog.tangeloPathBox.setText(Globals.tangeloPath)
+        
+        def pythonBrowse():
+            path = QFileDialog.getOpenFileName(dialog, u"Find python", dialog.pythonPathBox.text())[0]
+            if path != '':
+                dialog.pythonPathBox.setText(path)
+        
+        def tangeloBrowse():
+            path = QFileDialog.getOpenFileName(dialog, u"Find tangelo", dialog.tangeloPathBox.text())[0]
+            if path != '':
+                dialog.tangeloPathBox.setText(path)
+        
+        def cancel():
+            dialog.hide()
+            sys.exit()
+        
+        def ok():
+            Globals.pythonPath = os.path.expanduser(dialog.pythonPathBox.text())
+            Globals.tangeloPath = os.path.expanduser(dialog.tangeloPathBox.text())
+            
+            if not os.path.exists(Globals.pythonPath):
+                Globals.criticalError("Sorry, that python interpreter doesn't exist.")
+                return
+            if not os.path.exists(Globals.tangeloPath):
+                Globals.criticalError("Sorry, that tangelo executable doesn't exist.")
+                return
+            
+            Globals.mainWindow = Overview()
+            Globals.mainWindow.refresh()
+            dialog.hide()
+        dialog.show()
+        
+        dialog.tangeloBrowse.clicked.connect(tangeloBrowse)
+        dialog.pythonBrowse.clicked.connect(pythonBrowse)
+        dialog.cancelButton.clicked.connect(cancel)
+        dialog.okButton.clicked.connect(ok)
 
-def clearLayout(layout):
-    if layout is not None:
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            else:
-                clearLayout(item.layout())
+class ManagerHelper(QWidget):
+    # Sneaky way to override a virtual function on a loaded .ui widget
+    # ... according to the docs, this is how it should be done, but
+    # it still isn't working...
+    def closeEvent(self, event):
+        pid = self.windowTitle()
+        print self, 'hi', pid
+        '''self.manager = None
+        
+        # If no process is running, remove our widget from the overview as well;
+        # we're done
+        if self.pid == None:
+            Globals.mainWindow.removeDeadProcess(self)'''
+        
+        event.accept()
 
 class Process:
     def __init__(self, pid=None, configPath=None, nonDaemonProcess=None):
@@ -38,7 +113,6 @@ class Process:
         self.nonDaemonProcess = nonDaemonProcess
         self.widget = None
         self.manager = None
-        self.out = None
         self.err = None
         
         self.createWidget()
@@ -48,7 +122,8 @@ class Process:
         # TODO: Do I need to delete anything explicitly?
         infile = QFile('ui/process_widget.ui')
         infile.open(QFile.ReadOnly)
-        self.widget = Globals.loader.load(infile, Globals.mainWindow.window)
+        loader = QUiLoader()
+        self.widget = loader.load(infile, Globals.mainWindow.window)
         infile.close()
         
         self.updateWidget(True)
@@ -59,9 +134,7 @@ class Process:
             self.runningStatus = 'not running'
             self.widget.indicator.setPixmap(Globals.redPixmap)
             
-            # Close my temporary log files if they exist
-            if self.out != None:
-                self.out.close()
+            # Close my temporary log file if they exist
             if self.err != None:
                 self.err.close()
             
@@ -81,8 +154,21 @@ class Process:
             # Ask tangelo where our config file is
             if self.configPath == None:
                 self.configPath = subprocess.Popen( \
-                    ['tangelo', 'status', '--pid', str(self.pid), '--attr', 'config'], \
+                    [Globals.pythonPath, Globals.tangeloPath, 'status', '--pid', str(self.pid), '--attr', 'config'], \
                     stdout=subprocess.PIPE).communicate()[0].strip()
+                if not os.path.exists(self.configPath):
+                    # This is the odd scenario where a non-daemonized
+                    # instance was running before tangelo-wrapper started...
+                    # see if a config file was specified:
+                    cmdline = psutil.Process(pid=int(self.pid)).cmdline()
+                    if '-c' in cmdline:
+                        self.configPath = cmdline[cmdline.index('-c') + 1]
+                    else:
+                        for p in Globals.tangeloDefaultConfigPaths:
+                            if os.path.exists(p):
+                                self.configPath = p
+                                break
+                assert os.path.exists(self.configPath)
                         
             # Load the configuration stored in the file
             self.config = Globals.mainWindow.loadConfig(self.configPath)
@@ -91,33 +177,30 @@ class Process:
             if self.nonDaemonProcess == None:
                 self.config['daemonize'] = True
                 self.runningStatus = (subprocess.Popen( \
-                ['tangelo', 'status', '--pid', str(self.pid), '--attr', 'status'], \
+                [Globals.pythonPath, Globals.tangeloPath, 'status', '--pid', str(self.pid), '--attr', 'status'], \
                 stdout=subprocess.PIPE).communicate()[0].strip())
                 
                 # Override any other fields with the current state
                 interface = subprocess.Popen( \
-                    ['tangelo', 'status', '--pid', str(self.pid), '--attr', 'interface'], \
+                    [Globals.pythonPath, Globals.tangeloPath, 'status', '--pid', str(self.pid), '--attr', 'interface'], \
                     stdout=subprocess.PIPE).communicate()[0].split(':')
                 
                 self.config['hostname'] = interface[0].strip()
                 self.config['port'] = int(interface[1])
                 
                 self.config['logdir'] = os.path.split(subprocess.Popen( \
-                    ['tangelo', 'status', '--pid', str(self.pid), '--attr', 'log'], \
+                    [Globals.pythonPath, Globals.tangeloPath, 'status', '--pid', str(self.pid), '--attr', 'log'], \
                     stdout=subprocess.PIPE).communicate()[0].strip())[0]
                 self.config['root'] = subprocess.Popen( \
-                    ['tangelo', 'status', '--pid', str(self.pid), '--attr', 'root'], \
+                    [Globals.pythonPath, Globals.tangeloPath, 'status', '--pid', str(self.pid), '--attr', 'root'], \
                     stdout=subprocess.PIPE).communicate()[0].strip()
                 
-                self.out = None
                 self.err = None
             else:
                 assert not sys.platform.startswith('win')
                 self.config['daemonize'] = False
                 self.runningStatus = 'running (not daemonized)'
                 
-                if self.out == None:
-                    self.out = tempfile.NamedTemporaryFile('wb')
                 if self.err == None:
                     self.err = tempfile.NamedTemporaryFile('wb')
             
@@ -152,7 +235,10 @@ class Process:
             # Create the window
             infile = QFile('ui/process_manager.ui')
             infile.open(QFile.ReadOnly)
-            self.manager = Globals.loader.load(infile, None)
+            loader = QUiLoader()
+            # This isn't working...
+            loader.registerCustomWidget(ManagerHelper)
+            self.manager = loader.load(infile, None)
             infile.close()
             
             self.updateManager(True)
@@ -195,12 +281,7 @@ class Process:
             # Show the relevant log file (just the console output if not a daemon)
             logText = ""
             if self.nonDaemonProcess != None:
-                logText += "stdout:\n-------\n"
-                infile = open(self.out.name, 'rb')
-                logText += infile.read()
-                infile.close()
-                
-                logText += "\n\nstderr:\n-------\n"
+                logText += "stderr:\n-------\n"
                 infile = open(self.err.name, 'rb')
                 logText += infile.read()
                 infile.close()
@@ -213,8 +294,6 @@ class Process:
             self.manager.logBrowser.setPlainText(logText)
         
         if wireConnections:
-            self.manager.closeEvent = self.closeManager
-            
             self.manager.drop_privilegesCheckBox.stateChanged.connect(self.togglePrivileges)
             self.manager.browseRoot.clicked.connect(self.browseRoot)
             self.manager.browseLogdir.clicked.connect(self.browseLogdir)
@@ -223,7 +302,6 @@ class Process:
             self.manager.stopButton.clicked.connect(self.stop)
             self.manager.restartButton.clicked.connect(self.restart)
             self.manager.cancelButton.clicked.connect(self.manager.close)
-        
         self.manager.show()
     
     def updateConfig(self):
@@ -240,11 +318,6 @@ class Process:
         assert not sys.platform.startswith('win') or not self.config['daemonize']
         self.config['access_auth'] = self.manager.access_authCheckBox.checkState() == Qt.Checked
         Globals.mainWindow.saveConfig(self.config, self.configPath)
-    
-    def closeManager(self):
-        QWidget.closeEvent(self.manager)
-        # TODO: Do I need to delete anything explicitly?
-        self.manager = None
     
     def togglePrivileges(self):
         if self.manager.drop_privilegesCheckBox.checkState() == Qt.Checked:
@@ -269,22 +342,30 @@ class Process:
     
     def stop(self):
         self.updateConfig()
-        Globals.mainWindow.issueTangeloCommand(['tangelo', 'stop', '--pid', str(self.pid), '--verbose'], self)
+        Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'stop', '--pid', str(self.pid), '--verbose'], self)
     
     def restart(self):
-        # handles start or restart
+        # Corner case: we can't change the daemonize flag while a daemon is
+        # running, or tangelo enters a weird state. If we're trying to do this,
+        # we need to stop it separately before we mess with anything
+        if not self.config['daemonize'] and self.pid != None:
+            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'stop', '--pid', str(self.pid), '--verbose'], self)
+        
         self.updateConfig()
+        
+        # handles start or restart
         if self.pid == None:
-            Globals.mainWindow.issueTangeloCommand(['tangelo', 'start', '-c', self.configPath, '--verbose'], self)
+            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'start', '-c', self.configPath, '--verbose'], self)
         else:
-            Globals.mainWindow.issueTangeloCommand(['tangelo', 'restart', '--pid', str(self.pid), '-c', self.configPath, '--verbose'], self)
+            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'restart', '--pid', str(self.pid), '-c', self.configPath, '--verbose'], self)
 
 class Overview:
     def __init__(self):
         # Load UI files
         infile = QFile("ui/overview.ui")
         infile.open(QFile.ReadOnly)
-        self.window = Globals.loader.load(infile, None)
+        loader = QUiLoader()
+        self.window = loader.load(infile, None)
         infile.close()
         
         self.processes = {}
@@ -299,15 +380,15 @@ class Overview:
         
         knownPids = set(self.processes.keys())
         daemonPids = set(self.getDaemonPids())
-        nonDaemonProcesses = self.getNonDaemonProcesses()
-        nonDaemonPids = set(nonDaemonProcesses.keys())
+        allProcesses = self.getAllTangeloProcesses()
+        nonDaemonPids = set(allProcesses.keys()).difference(daemonPids)
         
         # remove widgets for processes that aren't running
         # and don't have dialogs open
         for pid in knownPids.difference(daemonPids, nonDaemonPids):
-            layout.removeWidget(self.processes[pid].widget)
-            self.processes[pid].widget.deleteLater()
-            del self.processes[pid]
+            if self.processes[pid].manager == None or not self.processes[pid].manager.isVisible():
+                self.removeDeadProcess(self.processes[pid])
+                del self.processes[pid]
         
         # add widgets for daemon processes that we haven't seen before
         for pid in daemonPids.difference(knownPids):
@@ -316,7 +397,7 @@ class Overview:
         
         # add widgets for non-daemon processes that we haven't seen before
         for pid in nonDaemonPids.difference(knownPids):
-            self.processes[pid] = Process(pid, nonDaemonProcess=nonDaemonProcesses[pid])
+            self.processes[pid] = Process(pid, nonDaemonProcess=allProcesses[pid])
             layout.addWidget(self.processes[pid].widget)
         
         if len(self.processes) == 0:
@@ -326,7 +407,7 @@ class Overview:
     
     def getDaemonPids(self):
         try:
-            status = subprocess.Popen(['tangelo','status','--pids'], stderr=subprocess.PIPE).communicate()[1]
+            status = subprocess.Popen([Globals.pythonPath, Globals.tangeloPath,'status','--pids'], stderr=subprocess.PIPE).communicate()[1]
             
             if status.startswith('no tangelo instances'):
                 return []
@@ -335,14 +416,23 @@ class Overview:
         except OSError as e:
             self.communicationAlert(e.strerror)
     
-    def getNonDaemonProcesses(self):
-        #TODO: use psutil to find all the non-daemon tangelo instances
-        return {}
+    def getAllTangeloProcesses(self):
+        byPid = {}
+        for p in psutil.process_iter():
+            try:
+                cmdline = p.cmdline()
+                # TODO: this is a really hacky way to find all tangelo instances
+                if len(cmdline) >= 3 and 'tangelo' in cmdline[1] and cmdline[2] in Globals.tangeloProcessCommands:
+                    byPid[str(p.pid)] = p
+            except psutil.AccessDenied:
+                continue
+        return byPid
     
     def findOrSaveConfig(self):
         infile = QFile('ui/config_path.ui')
         infile.open(QFile.ReadOnly)
-        dialog = Globals.loader.load(infile, self.window)
+        loader = QUiLoader()
+        dialog = loader.load(infile, self.window)
         infile.close()
         
         def browse():
@@ -397,7 +487,7 @@ class Overview:
         if sys.platform.startswith('win'):
             config['daemonize'] = False
         proc = Process(configPath=path)
-        self.issueTangeloCommand(['tangelo', 'start', '-c', path, '--verbose'], proc)
+        self.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'start', '-c', path, '--verbose'], proc)
         self.window.scrollContents.layout().addWidget(proc.widget)
     
     def issueTangeloCommand(self, command, process):
@@ -415,32 +505,18 @@ class Overview:
                 process.nonDaemonProcess.kill()
                 process.nonDaemonProcess = None
                 if 'stop' in command:
-                    # Clear our temporary stdout and stderr storage
-                    process.out.close()
+                    # Clear our temporary stderr storage
                     process.err.close()
-                    process.out = None
                     process.err = None
-            elif process.config['daemonize'] and process.pid != None:
-                # If the process was running as a daemon, but now
-                # we're going to un-daemonize it, we need to stop
-                # it separately
-                separateStop = ['tangelo', 'stop', '--pid', str(process.pid), '--verbose']
-                tangeloProcess = subprocess.Popen(separateStop, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                output += " ".join(separateStop) + '\n\n' + '\n\n'.join(tangeloProcess.communicate()) + "\n\n"
-                
-                if 'restart' in command:
-                    command[command.index('restart')] = 'start'
             
             output += " ".join(command)
             
             if 'stop' not in command:
                 # How are we starting up a new process (or are we)?
                 if not process.config['daemonize']:
-                    if process.out == None:
-                        process.out = tempfile.NamedTemporaryFile('wb')
                     if process.err == None:
                         process.err = tempfile.NamedTemporaryFile('wb')
-                    process.nonDaemonProcess = subprocess.Popen(command, stdout=process.out, stderr=process.err)
+                    process.nonDaemonProcess = subprocess.Popen(command, stderr=process.err)
                     process.pid = process.nonDaemonProcess.pid
                 else:
                     oldPids = self.processes.keys()
@@ -457,16 +533,27 @@ class Overview:
                             break
                     assert foundNewPid
             else:
+                tangeloProcess = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output += '\n\n'.join(tangeloProcess.communicate())
                 process.pid = None
             
-            # If we started a new process, store it by its pid
+            # If we started a new process, store it by its pid,
+            # otherwise remove it if its manager isn't open
             if process.pid != None:
                 self.processes[process.pid] = process
+            
+            #TODO: the call to isVisible() causes a segfault...
+            #elif process.manager == None or not process.manager.isVisible():
+            #    self.removeDeadPid(process.pid)
             
             process.updateWidget()
             self.window.consoleOutput.setPlainText(output)
         except OSError as e:
             self.communicationAlert(e.strerror)
+    
+    def removeDeadProcess(self, process):
+        self.window.scrollContents.layout().removeWidget(process.widget)
+        process.widget.deleteLater()
     
     def loadConfig(self, configPath):
         infile = open(configPath, 'rb')
@@ -509,16 +596,11 @@ class Overview:
         outfile.close()
     
     def communicationAlert(self, message):
-        msgBox = QMessageBox()
-        msgBox.setIcon(Qt.Critical)
-        msgBox.setText("Sorry, there was an error communicating with tangelo:\n\n" + message)
-        sys.exit(msgBox.exec_())
+        sys.exit(Globals.criticalError("Sorry, there was an error communicating with tangelo:\n\n" + message))
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     Globals.load()
-    Globals.mainWindow = Overview()
-    Globals.mainWindow.refresh()
     exitCode = app.exec_()
     del Globals.mainWindow
     sys.exit(exitCode)
