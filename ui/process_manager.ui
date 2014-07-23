@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>mainWidget</class>
- <widget class="QWidget" name="mainWidget">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>913</width>
-    <height>395</height>
+    <width>708</width>
+    <height>416</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,309 +17,322 @@
    <iconset>
     <normaloff>images/indicators/green.png</normaloff>images/indicators/green.png</iconset>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <widget class="QWidget" name="widget_5" native="true">
-     <layout class="QHBoxLayout" name="horizontalLayout_2">
-      <property name="margin">
-       <number>12</number>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QWidget" name="widget_5" native="true">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="margin">
+        <number>12</number>
+       </property>
+       <item>
+        <widget class="QWidget" name="widget" native="true">
+         <layout class="QGridLayout" name="gridLayout_3">
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>port</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>hostname</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="rootField">
+            <property name="toolTip">
+             <string>The path to the directory to be served by Tangelo as the web root.</string>
+            </property>
+            <property name="statusTip">
+             <string>The path to the directory to be served by Tangelo as the web root.</string>
+            </property>
+            <property name="text">
+             <string>/usr/share/tangelo/web</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>root</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>vtkpython</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="logdirField">
+            <property name="toolTip">
+             <string>The directory that contains the Tangelo log file (tangelo.log)</string>
+            </property>
+            <property name="statusTip">
+             <string>The directory that contains the Tangelo log file (tangelo.log)</string>
+            </property>
+            <property name="text">
+             <string>/var/log</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="vtkField">
+            <property name="toolTip">
+             <string>The path to the vtkpython program (for use in VTK Web capabilities).</string>
+            </property>
+            <property name="statusTip">
+             <string>The path to the vtkpython program (for use in VTK Web capabilities).</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>logdir</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QPushButton" name="browseRoot">
+            <property name="text">
+             <string>Browse...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QPushButton" name="browseLogdir">
+            <property name="text">
+             <string>Browse...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="2">
+           <widget class="QPushButton" name="browseVtk">
+            <property name="text">
+             <string>Browse...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="2">
+           <widget class="QLineEdit" name="hostnameField">
+            <property name="toolTip">
+             <string>The hostname interface on which to listen for connections.</string>
+            </property>
+            <property name="statusTip">
+             <string>The hostname interface on which to listen for connections.</string>
+            </property>
+            <property name="text">
+             <string>localhost</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1" colspan="2">
+           <widget class="QSpinBox" name="portField">
+            <property name="toolTip">
+             <string>The port number on which to listen for connections.</string>
+            </property>
+            <property name="statusTip">
+             <string>The port number on which to listen for connections.</string>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>8080</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="widget_3" native="true">
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="drop_privilegesCheckBox">
+            <property name="toolTip">
+             <string>Drop privileges when started as the superuser</string>
+            </property>
+            <property name="statusTip">
+             <string>Drop privileges when started as the superuser</string>
+            </property>
+            <property name="text">
+             <string>drop_privileges</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QWidget" name="drop_privilegesExtras" native="true">
+            <layout class="QGridLayout" name="gridLayout">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_11">
+               <property name="text">
+                <string>user</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLineEdit" name="userField">
+               <property name="toolTip">
+                <string>The user account to drop privileges to</string>
+               </property>
+               <property name="statusTip">
+                <string>The user account to drop privileges to</string>
+               </property>
+               <property name="text">
+                <string>nobody</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLineEdit" name="groupField">
+               <property name="toolTip">
+                <string>The user group to drop privileges to</string>
+               </property>
+               <property name="statusTip">
+                <string>The user group to drop privileges to</string>
+               </property>
+               <property name="text">
+                <string>nobody</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_12">
+               <property name="text">
+                <string>group</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="daemonizeCheckBox">
+            <property name="acceptDrops">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Run as a daemon</string>
+            </property>
+            <property name="statusTip">
+             <string>Run as a daemon</string>
+            </property>
+            <property name="text">
+             <string>daemonize</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QCheckBox" name="access_authCheckBox">
+            <property name="toolTip">
+             <string>Protect directories containing a .htaccess file</string>
+            </property>
+            <property name="statusTip">
+             <string>Protect directories containing a .htaccess file</string>
+            </property>
+            <property name="text">
+             <string>access_auth</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="widget_4" native="true">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="cancelButton">
+         <property name="text">
+          <string>Cancel</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="stopButton">
+         <property name="text">
+          <string>Stop</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="restartButton">
+         <property name="text">
+          <string>Save and Restart</string>
+         </property>
+         <property name="autoDefault">
+          <bool>true</bool>
+         </property>
+         <property name="default">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPlainTextEdit" name="logBrowser">
+      <property name="font">
+       <font>
+        <family>Courier</family>
+        <pointsize>12</pointsize>
+       </font>
       </property>
-      <item>
-       <widget class="QWidget" name="widget_2" native="true">
-        <layout class="QGridLayout" name="gridLayout_2">
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>port</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>hostname</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QLineEdit" name="rootField">
-           <property name="toolTip">
-            <string>The path to the directory to be served by Tangelo as the web root.</string>
-           </property>
-           <property name="statusTip">
-            <string>The path to the directory to be served by Tangelo as the web root.</string>
-           </property>
-           <property name="text">
-            <string>/usr/share/tangelo/web</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>root</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_5">
-           <property name="text">
-            <string>vtkpython</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="QLineEdit" name="logdirField">
-           <property name="toolTip">
-            <string>The directory that contains the Tangelo log file (tangelo.log)</string>
-           </property>
-           <property name="statusTip">
-            <string>The directory that contains the Tangelo log file (tangelo.log)</string>
-           </property>
-           <property name="text">
-            <string>/var/log</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="QLineEdit" name="vtkField">
-           <property name="toolTip">
-            <string>The path to the vtkpython program (for use in VTK Web capabilities).</string>
-           </property>
-           <property name="statusTip">
-            <string>The path to the vtkpython program (for use in VTK Web capabilities).</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="label_4">
-           <property name="text">
-            <string>logdir</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="2">
-          <widget class="QPushButton" name="browseRoot">
-           <property name="text">
-            <string>Browse...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="2">
-          <widget class="QPushButton" name="browseLogdir">
-           <property name="text">
-            <string>Browse...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="2">
-          <widget class="QPushButton" name="browseVtk">
-           <property name="text">
-            <string>Browse...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1" colspan="2">
-          <widget class="QLineEdit" name="hostnameField">
-           <property name="toolTip">
-            <string>The hostname interface on which to listen for connections.</string>
-           </property>
-           <property name="statusTip">
-            <string>The hostname interface on which to listen for connections.</string>
-           </property>
-           <property name="text">
-            <string>localhost</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1" colspan="2">
-          <widget class="QSpinBox" name="portField">
-           <property name="toolTip">
-            <string>The port number on which to listen for connections.</string>
-           </property>
-           <property name="statusTip">
-            <string>The port number on which to listen for connections.</string>
-           </property>
-           <property name="maximum">
-            <number>65535</number>
-           </property>
-           <property name="value">
-            <number>8080</number>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QWidget" name="widget_3" native="true">
-        <layout class="QGridLayout" name="gridLayout_3">
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="drop_privilegesCheckBox">
-           <property name="toolTip">
-            <string>Drop privileges when started as the superuser</string>
-           </property>
-           <property name="statusTip">
-            <string>Drop privileges when started as the superuser</string>
-           </property>
-           <property name="text">
-            <string>drop_privileges</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QWidget" name="drop_privilegesExtras" native="true">
-           <layout class="QGridLayout" name="gridLayout">
-            <item row="0" column="0">
-             <widget class="QLabel" name="label_7">
-              <property name="text">
-               <string>user</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="1">
-             <widget class="QLineEdit" name="userField">
-              <property name="toolTip">
-               <string>The user account to drop privileges to</string>
-              </property>
-              <property name="statusTip">
-               <string>The user account to drop privileges to</string>
-              </property>
-              <property name="text">
-               <string>nobody</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLineEdit" name="groupField">
-              <property name="toolTip">
-               <string>The user group to drop privileges to</string>
-              </property>
-              <property name="statusTip">
-               <string>The user group to drop privileges to</string>
-              </property>
-              <property name="text">
-               <string>nobody</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label_8">
-              <property name="text">
-               <string>group</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QCheckBox" name="daemonizeCheckBox">
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="toolTip">
-            <string>Run as a daemon</string>
-           </property>
-           <property name="statusTip">
-            <string>Run as a daemon</string>
-           </property>
-           <property name="text">
-            <string>daemonize</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <widget class="QCheckBox" name="access_authCheckBox">
-           <property name="toolTip">
-            <string>Protect directories containing a .htaccess file</string>
-           </property>
-           <property name="statusTip">
-            <string>Protect directories containing a .htaccess file</string>
-           </property>
-           <property name="text">
-            <string>access_auth</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QWidget" name="widget_4" native="true">
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="cancelButton">
-        <property name="text">
-         <string>Cancel</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="stopButton">
-        <property name="text">
-         <string>Stop</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="restartButton">
-        <property name="text">
-         <string>Save and Restart</string>
-        </property>
-        <property name="autoDefault">
-         <bool>true</bool>
-        </property>
-        <property name="default">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPlainTextEdit" name="logBrowser">
-     <property name="font">
-      <font>
-       <family>Courier</family>
-       <pointsize>12</pointsize>
-      </font>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-  </layout>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>708</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
  <connections/>

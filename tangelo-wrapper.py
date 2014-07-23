@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, os, subprocess, psutil, json, socket, tempfile
-from PySide.QtGui import QApplication, QFileDialog, QWidget, QMessageBox, QIcon, QPixmap
+from PySide.QtGui import QApplication, QFileDialog, QMainWindow, QMessageBox, QIcon, QPixmap
 from PySide.QtCore import QFile, Qt
 from PySide.QtUiTools import QUiLoader
 
@@ -18,6 +18,7 @@ class Globals:
     ]
     tangeloPath = None
     pythonPath = None
+    numProcesses = 0
     
     @staticmethod
     def load():
@@ -89,13 +90,26 @@ class Globals:
         dialog.cancelButton.clicked.connect(cancel)
         dialog.okButton.clicked.connect(ok)
 
-class ManagerHelper(QWidget):
+class MainHelper(QMainWindow):
+    def closeEvent(self, event):
+        print 'closing main'
+        for proc in Globals.mainWindow.processes.itervalues():
+            if proc.manager != None:
+                proc.manager.close()
+                proc.manager = None
+        for proc in Globals.mainWindow.deadProcesses.itervalues():
+            if proc.manager != None:
+                proc.manager.close()
+                proc.manager = None
+        event.accept()
+
+class ManagerHelper(QMainWindow):
     # Sneaky way to override a virtual function on a loaded .ui widget
     # ... according to the docs, this is how it should be done, but
     # it still isn't working...
     def closeEvent(self, event):
-        pid = self.windowTitle()
-        print self, 'hi', pid
+        t = self.windowTitle()
+        print self, 'closing manager:', t
         '''self.manager = None
         
         # If no process is running, remove our widget from the overview as well;
@@ -104,9 +118,12 @@ class ManagerHelper(QWidget):
             Globals.mainWindow.removeDeadProcess(self)'''
         
         event.accept()
+        Globals.mainWindow.refresh()
 
 class Process:
     def __init__(self, pid=None, configPath=None, nonDaemonProcess=None):
+        Globals.numProcesses += 1
+        self.processNumber = Globals.numProcesses
         self.pid = pid
         self.configPath = configPath
         assert self.pid != None or self.configPath != None
@@ -229,19 +246,20 @@ class Process:
         
     def createManager(self):
         if self.manager != None:
-            self.manager.show()
             self.updateManager()
+            self.manager.show()
         else:
             # Create the window
             infile = QFile('ui/process_manager.ui')
             infile.open(QFile.ReadOnly)
             loader = QUiLoader()
-            # This isn't working...
+            #TODO: This isn't working:
             loader.registerCustomWidget(ManagerHelper)
-            self.manager = loader.load(infile, None)
+            self.manager = loader.load(infile, Globals.mainWindow.window)
             infile.close()
             
             self.updateManager(True)
+            self.manager.show()
     
     def updateManager(self, wireConnections=False):
         if self.pid == None:
@@ -278,20 +296,21 @@ class Process:
             self.manager.restartButton.setText("Save and Restart")
             self.manager.stopButton.setEnabled(True)
             
-            # Show the relevant log file (just the console output if not a daemon)
-            logText = ""
-            if self.nonDaemonProcess != None:
-                logText += "stderr:\n-------\n"
-                infile = open(self.err.name, 'rb')
-                logText += infile.read()
-                infile.close()
-            else:
-                logPath = os.path.join(self.config['logdir'], 'tangelo.log')
-                logText += logPath + ":\n" + "".join("-" for x in xrange(len(logPath) + 1)) + "\n"
+        # Show the relevant log file (just the console output if not a daemon)
+        logText = "Couldn't open log file."
+        if self.nonDaemonProcess != None:
+            logText = "stderr:\n-------\n"
+            infile = open(self.err.name, 'rb')
+            logText += infile.read()
+            infile.close()
+        else:
+            logPath = os.path.join(self.config['logdir'], 'tangelo.log')
+            if os.path.exists(logPath):
+                logText = logPath + ":\n" + "".join("-" for x in xrange(len(logPath) + 1)) + "\n"
                 infile = open(logPath, 'rb')
                 logText += infile.read()
                 infile.close()
-            self.manager.logBrowser.setPlainText(logText)
+        self.manager.logBrowser.setPlainText(logText)
         
         if wireConnections:
             self.manager.drop_privilegesCheckBox.stateChanged.connect(self.togglePrivileges)
@@ -302,7 +321,6 @@ class Process:
             self.manager.stopButton.clicked.connect(self.stop)
             self.manager.restartButton.clicked.connect(self.restart)
             self.manager.cancelButton.clicked.connect(self.manager.close)
-        self.manager.show()
     
     def updateConfig(self):
         assert self.manager != None
@@ -341,23 +359,32 @@ class Process:
             self.manager.vtkField.setText(path)
     
     def stop(self):
-        self.updateConfig()
-        Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'stop', '--pid', str(self.pid), '--verbose'], self)
+        output = Globals.mainWindow.modifyProcess(['stop', '--pid', str(self.pid), '--verbose'], self)
+        Globals.mainWindow.window.consoleOutput.setPlainText(output)
+        Globals.mainWindow.updateWidgets()
     
     def restart(self):
         # Corner case: we can't change the daemonize flag while a daemon is
         # running, or tangelo enters a weird state. If we're trying to do this,
         # we need to stop it separately before we mess with anything
-        if not self.config['daemonize'] and self.pid != None:
-            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'stop', '--pid', str(self.pid), '--verbose'], self)
+        output = ""
+        if self.pid != None and self.config['daemonize'] and self.manager.daemonizeCheckBox.checkState() == Qt.Unchecked:
+            output += Globals.mainWindow.modifyProcess(['stop', '--pid', str(self.pid), '--verbose'], self)
+            output += "\n\n"
+        #else:
+        #    print self.pid, self.config['daemonize'], self.manager.daemonizeCheckBox.checkState()
         
+        output += "Writing config...\n\n"
         self.updateConfig()
         
         # handles start or restart
         if self.pid == None:
-            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'start', '-c', self.configPath, '--verbose'], self)
+            output += Globals.mainWindow.modifyProcess(['start', '-c', self.configPath, '--verbose'], self)
         else:
-            Globals.mainWindow.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'restart', '--pid', str(self.pid), '-c', self.configPath, '--verbose'], self)
+            output += Globals.mainWindow.modifyProcess(['restart', '--pid', str(self.pid), '-c', self.configPath, '--verbose'], self)
+        
+        Globals.mainWindow.window.consoleOutput.setPlainText(output)
+        Globals.mainWindow.updateWidgets()
 
 class Overview:
     def __init__(self):
@@ -365,45 +392,59 @@ class Overview:
         infile = QFile("ui/overview.ui")
         infile.open(QFile.ReadOnly)
         loader = QUiLoader()
+        #TODO: this isn't working:
+        loader.registerCustomWidget(MainHelper)
         self.window = loader.load(infile, None)
         infile.close()
         
         self.processes = {}
+        self.deadProcesses = {}
         
         # Events
         self.window.refreshButton.clicked.connect(self.refresh)
         self.window.startButton.clicked.connect(self.findOrSaveConfig)
         self.window.show()
+        
+    def updateWidgets(self):
+        for proc in self.processes.itervalues():
+            proc.updateWidget()
+        for proc in self.deadProcesses.itervalues():
+            proc.updateWidget()
     
     def refresh(self, clearOutputOnSuccess=True):
         layout = self.window.scrollContents.layout()
         
-        knownPids = set(self.processes.keys())
-        daemonPids = set(self.getDaemonPids())
+        daemonPids = self.getDaemonPids()
         allProcesses = self.getAllTangeloProcesses()
-        nonDaemonPids = set(allProcesses.keys()).difference(daemonPids)
         
-        # remove widgets for processes that aren't running
-        # and don't have dialogs open
-        for pid in knownPids.difference(daemonPids, nonDaemonPids):
-            if self.processes[pid].manager == None or not self.processes[pid].manager.isVisible():
-                self.removeDeadProcess(self.processes[pid])
-                del self.processes[pid]
+        # Create our Process objects
+        for pid in daemonPids:
+            if not self.processes.has_key(pid):
+                self.processes[pid] = Process(pid)
         
-        # add widgets for daemon processes that we haven't seen before
-        for pid in daemonPids.difference(knownPids):
-            self.processes[pid] = Process(pid)
-            layout.addWidget(self.processes[pid].widget)
+        for pid, proc in allProcesses.iteritems():
+            if pid not in daemonPids and not self.processes.has_key(pid):
+                self.processes[pid] = Process(pid, nonDaemonProcess=proc)
         
-        # add widgets for non-daemon processes that we haven't seen before
-        for pid in nonDaemonPids.difference(knownPids):
-            self.processes[pid] = Process(pid, nonDaemonProcess=allProcesses[pid])
-            layout.addWidget(self.processes[pid].widget)
+        # Add the widgets that need to be created
+        for pid, process in self.processes.iteritems():
+            index = layout.indexOf(process.widget)
+            if index == -1:
+                layout.addWidget(process.widget)
+            process.updateWidget()
+        
+        # Remove the widgets that need to be removed
+        for processNumber, process in self.deadProcesses.items():
+            i = layout.indexOf(process.widget)
+            if process.manager != None and i != -1:
+                layout.takeAt(i)
+                process.widget.deleteLater()
+                del self.deadProcesses[processNumber]
         
         if len(self.processes) == 0:
             self.window.consoleOutput.setPlainText('No tangelo instances are running.')
-        elif clearOutputOnSuccess:
-            self.window.consoleOutput.setPlainText('')
+        else:
+            self.window.consoleOutput.setPlainText('Successfully refreshed.')
     
     def getDaemonPids(self):
         try:
@@ -457,6 +498,7 @@ class Overview:
         dialog.okButton.clicked.connect(ok)
     
     def start(self, path, autodetectPort=True):
+        output = ""
         if os.path.exists(path):
             config = self.loadConfig(path)
         else:
@@ -473,29 +515,37 @@ class Overview:
                 'access_auth' : True
             }
         if autodetectPort:
-            # Find an open socket
+            output += "Finding an open socket...\n\n"
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.bind(('',0))
             config['port'] = s.getsockname()[1]
             s.close()
         try:
+            output += "Writing config...\n\n"
             self.saveConfig(config, path)
         except IOError as e:
-            self.window.consoleOutput.setPlainText("Couldn't save " + path + ":" + e.strerror)
+            output += "Couldn't save " + path + ": " + e.strerror
+            self.window.consoleOutput.setPlainText(output)
             return
         
         if sys.platform.startswith('win'):
             config['daemonize'] = False
         proc = Process(configPath=path)
-        self.issueTangeloCommand([Globals.pythonPath, Globals.tangeloPath, 'start', '-c', path, '--verbose'], proc)
+        output += self.modifyProcess(['start', '-c', path, '--verbose'], proc)
         self.window.scrollContents.layout().addWidget(proc.widget)
+        
+        self.window.consoleOutput.setPlainText(output)
     
-    def issueTangeloCommand(self, command, process):
+    def modifyProcess(self, command, process):
         output = ""
+        command.insert(0, Globals.tangeloPath)
+        command.insert(0, Globals.pythonPath)
         try:
             # We don't want to store the process by its old pid anymore
             if process.pid != None:
                 del self.processes[process.pid]
+            elif self.deadProcesses.has_key(process.processNumber):
+                del self.deadProcesses[process.processNumber]
             
             # If the process was already running (not as a daemon),
             # we need to kill it
@@ -509,7 +559,9 @@ class Overview:
                     process.err.close()
                     process.err = None
             
+            output += "Running:\n"
             output += " ".join(command)
+            output += "\n\n"
             
             if 'stop' not in command:
                 # How are we starting up a new process (or are we)?
@@ -518,10 +570,13 @@ class Overview:
                         process.err = tempfile.NamedTemporaryFile('wb')
                     process.nonDaemonProcess = subprocess.Popen(command, stderr=process.err)
                     process.pid = process.nonDaemonProcess.pid
+                    infile = open(process.err.name, 'rb')
+                    output += infile.read()
+                    infile.close()
                 else:
                     oldPids = self.processes.keys()
                     tangeloProcess = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    output += '\n\n' + '\n\n'.join(tangeloProcess.communicate())
+                    output += '\n\n'.join(tangeloProcess.communicate())
                     process.nonDaemonProcess = None
                     newPids = self.getDaemonPids()
                     
@@ -541,15 +596,13 @@ class Overview:
             # otherwise remove it if its manager isn't open
             if process.pid != None:
                 self.processes[process.pid] = process
-            
-            #TODO: the call to isVisible() causes a segfault...
-            #elif process.manager == None or not process.manager.isVisible():
-            #    self.removeDeadPid(process.pid)
-            
-            process.updateWidget()
-            self.window.consoleOutput.setPlainText(output)
+            else:
+                self.deadProcesses[process.processNumber] = process
+            self.updateWidgets()
+            return output
         except OSError as e:
             self.communicationAlert(e.strerror)
+            return ""
     
     def removeDeadProcess(self, process):
         self.window.scrollContents.layout().removeWidget(process.widget)
